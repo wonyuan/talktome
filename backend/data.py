@@ -7,18 +7,23 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-cors = CORS(app)
+CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}})
 
 api_key = os.getenv('API_KEY')
 co = cohere.Client(api_key)
 
 chat_history = []
 
+# The original fine-tuned models and the Classify API were removed by Cohere
+# (Sept 2025). Persona behavior is now driven by the system prompt in /chat,
+# so every persona maps to the same current base model.
+BASE_MODEL = "command-a-03-2025"
+
 persona_models = {
-    "Angry Adam": "ef9183fe-75a5-4686-b7ff-14fced618013-ft",
-    "Quiet Quintin": "ebbfe6bd-0c47-42e6-8afe-949a8bfe9e34-ft",
-    "Judgmental Judy": "d5452d1d-d8bd-42d6-a28c-321f79f96572-ft",
-    "Happy Hannah": "5340c40f-9e3b-4d16-8d4c-9a1d4495e905-ft"
+    "Angry Adam": BASE_MODEL,
+    "Quiet Quintin": BASE_MODEL,
+    "Judgmental Judy": BASE_MODEL,
+    "Happy Hannah": BASE_MODEL
 }
 
 
@@ -31,18 +36,34 @@ def classify():
         if not paragraph:
             return jsonify({"error": "No paragraph provided!"}), 400
 
-        response = co.classify(
-            model = '5ae71449-3ae0-488f-a703-eb0275839e8f-ft',
-            inputs = [paragraph]
+        # The Cohere Classify API was removed (Sept 2025), so classify via Chat:
+        # ask the model to pick exactly one persona label.
+        labels = list(persona_models.keys())
+        classify_prompt = (
+            "You are classifying a parent's description of their teenager into one "
+            "of these teen personas:\n"
+            f"{', '.join(labels)}.\n\n"
+            "Respond with ONLY the exact label text, nothing else.\n\n"
+            f"Description: {paragraph}"
         )
 
-        highest_confidence = max(response.classifications, key = lambda x: x.confidence)
-        classification = highest_confidence.prediction
-        confidence_level = highest_confidence.confidence
+        response = co.chat(
+            model = BASE_MODEL,
+            message = classify_prompt,
+            temperature = 0
+        )
 
-        if confidence_level < 0.25:
-            return jsonify({"error": "Confidence too low. Please provide more details."}), 400
+        prediction = response.text.strip()
+        # Match the model output back to a known label (tolerate extra text/case).
+        classification = next(
+            (l for l in labels if l.lower() in prediction.lower()),
+            None
+        )
 
+        if not classification:
+            return jsonify({"error": "Could not classify. Please provide more details."}), 400
+
+        confidence_level = 1.0
         chat_id = persona_models.get(classification)
         if not chat_id:
             return jsonify({"error": f"No model found for classification: {classification}"}), 404
@@ -171,4 +192,4 @@ def evaluation():
 
     
 if __name__ == "__main__":
-    app.run(debug = True)
+    app.run(debug = True, port = 5001)
