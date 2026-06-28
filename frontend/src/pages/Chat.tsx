@@ -12,6 +12,7 @@ import {
 } from '@mantine/core';
 import { IconSend, IconArrowLeft } from '@tabler/icons-react';
 import ChatMessage from '@molecules/ChatMessage';
+import TypingIndicator from '@molecules/TypingIndicator';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { theme } from '@styles/theme';
 import { profiles } from '@constants/personas';
@@ -34,6 +35,7 @@ const Chat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [scenario, setScenario] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const location = useLocation();
@@ -60,7 +62,7 @@ const Chat = () => {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, isTyping]);
 
   // EVALUATION ENDPOINT
   const { makeRequest } = useRequest({
@@ -86,26 +88,38 @@ const Chat = () => {
     }
   };
 
+  // Minimum time the typing bubble stays up, so replies feel natural even when
+  // the API responds instantly.
+  const MIN_TYPING_MS = 3000;
+
   const sendMessage = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || isTyping) return;
 
     const userMessage = input;
     const userMessageObj = { text: userMessage, isUser: true };
-    
+
     chatHistory.push(userMessageObj);
     setMessages((prevMessages) => [...prevMessages, userMessageObj]);
-    setInput(''); 
+    setInput('');
+    setIsTyping(true);
 
     const params = {
       classification: persona.classification,
       situation: paragraph,
       user_input: userMessage,
-      // chat_history: chatHistory, 
+      // chat_history: chatHistory,
     };
 
     try {
+      const start = Date.now();
       const data = await fetchChat({ params });
       const botResponse = data?.bot_response || "Sorry, I couldn't get a response.";
+
+      // Keep the typing bubble up for at least MIN_TYPING_MS total.
+      const elapsed = Date.now() - start;
+      if (elapsed < MIN_TYPING_MS) {
+        await new Promise((resolve) => setTimeout(resolve, MIN_TYPING_MS - elapsed));
+      }
 
       const botMessageObj = { text: botResponse, isUser: false };
       chatHistory.push(botMessageObj);
@@ -113,6 +127,8 @@ const Chat = () => {
 
     } catch (error) {
       console.error('Error fetching chatbot response:', error);
+    } finally {
+      setIsTyping(false);
     }
   };
 
@@ -209,6 +225,7 @@ const Chat = () => {
                   {messages.map((msg, index) => (
                     <ChatMessage key={index} text={msg.text} isUser={msg.isUser} />
                   ))}
+                  {isTyping && <TypingIndicator />}
                   <div ref={messagesEndRef} />
                 </Box>
 
@@ -223,6 +240,7 @@ const Chat = () => {
                   />
                   <Button
                     onClick={sendMessage}
+                    disabled={isTyping}
                     variant="gradient"
                     gradient={{ from: m.colors.ebony[1], to: m.colors.eerie[1], deg: 45 }}
                   >

@@ -145,47 +145,78 @@ def chat():
         chat_history.append({"role": "Chatbot", "message": bot_response})
         return jsonify({"bot_response": bot_response})
     
+EVAL_SECTIONS = [
+    "What You Did Well",
+    "Areas for Improvement",
+    "Advice for Better Connection",
+]
+
+
+def parse_evaluation(text):
+    """Split the model output into the three known sections, preserving normal
+    punctuation. Robust to markdown (**, ##) and to the headings appearing in
+    any order."""
+    cleaned = text.replace("**", "").replace("#", "").replace("*", "")
+    lowered = cleaned.lower()
+
+    # Find where each heading starts in the text.
+    found = []
+    for heading in EVAL_SECTIONS:
+        pos = lowered.find(heading.lower())
+        if pos != -1:
+            found.append((pos, heading))
+    found.sort()
+
+    result = {}
+    for i, (pos, heading) in enumerate(found):
+        start = pos + len(heading)
+        end = found[i + 1][0] if i + 1 < len(found) else len(cleaned)
+        body = cleaned[start:end].strip().lstrip(":").strip()
+        result[heading] = body
+    return result
+
+
 @app.route('/evaluation', methods=['POST'])
 def evaluation():
     try:
-        data = request.json  # ✅ No need to extract "params"
-        situation = data.get("scenario")  # ✅ Matches frontend
-        chat = data.get("chat_history")  # ✅ Matches frontend
+        data = request.json
+        situation = data.get("scenario")
+        chat = data.get("chat_history")
 
-        stream = co.chat_stream( 
+        prompt = (
+            f"A parent practiced a conversation with their teenager.\n\n"
+            f"Situation: {situation}\n\n"
+            f"Conversation: {chat}\n\n"
+            "Give the parent warm, specific, constructive feedback. "
+            "Use EXACTLY these three headings, each on its own line, followed by "
+            "a short paragraph (2-4 sentences) written directly to the parent as 'you':\n"
+            "What You Did Well:\n"
+            "Areas for Improvement:\n"
+            "Advice for Better Connection:\n"
+            "Do not use any markdown, bullet points, or asterisks."
+        )
+
+        stream = co.chat_stream(
             model='c4ai-aya-expanse-32b',
-            message = f"Based on this information: {situation}, and this conversation: {chat}. ALWAYS Answer the following: 'what the parent did well', 'areas for improvement', and 'advice for better connection'. Give the heading and a text responses for each topic.",
+            message=prompt,
             temperature=0.3,
             chat_history=[],
             prompt_truncation='AUTO'
-        ) 
+        )
 
-        # well, improve, connection = "", "", ""
         output = ""
-
         for event in stream:
             if event.event_type == "text-generation":
                 output += event.text
-                # print(output, end='')
-        
-        sections = output.split('**')
-        response = {}
 
-        for i in range(1, len(sections), 2):  
-            key = sections[i].strip().rstrip(':')  
-            value = sections[i + 1].strip() if i + 1 < len(sections) else ""
-            key = "".join(c for c in key if c.isalnum() or c.isspace())  
-            value = "".join(c for c in value if c.isalnum() or c.isspace() or c in ".,!?")  
-            response[key] = value
+        response = parse_evaluation(output)
 
-        print(response)  
+        # Fallback: if parsing found nothing, return the raw text under one key
+        # so the user still sees their feedback.
+        if not response:
+            response = {"Feedback": output.strip()}
 
-        return {
-            "Output": response
-        }
-        # return {
-        #     "Output": output
-        # }
+        return {"Output": response}
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500

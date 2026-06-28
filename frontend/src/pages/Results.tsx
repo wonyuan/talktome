@@ -1,5 +1,5 @@
 import { theme } from "@styles/theme.ts";
-import { IconArrowLeft, IconRepeat } from '@tabler/icons-react';
+import { IconArrowLeft, IconRepeat, IconThumbUp, IconBulb, IconHeart, IconMessageCircle } from '@tabler/icons-react';
 import { Box, Text, Button, Flex, MantineProvider, Avatar, useMantineTheme } from '@mantine/core';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { profiles } from '@constants/personas';
@@ -102,17 +102,39 @@ const Results = () => {
                         and finally, we've gathered some insights to help you navigate similar situations in the future:
                     </Text>
 
-                    <Box sx={{ marginTop: "20px" }}>
-                        {data?.Output && Object.entries(data.Output).map(([category, message]) => (
-                            <Box key={category} sx={{ marginBottom: "12px" }}>
-                                <Text sx={{ fontSize: "14px", fontWeight: 700, color: m.colors.snow[4] }}>
-                                    {category}
-                                </Text>
-                                <Text sx={{ fontSize: "12px", color: m.colors.snow[4] }}>
-                                    {message}
-                                </Text>
-                            </Box>
-                        ))}
+                    <Box sx={{ marginTop: "24px" }}>
+                        {data?.Output && Object.entries(data.Output).map(([category, message]) => {
+                            const iconFor = (name: string) => {
+                                const n = name.toLowerCase();
+                                if (n.includes("well")) return <IconThumbUp size={18} />;
+                                if (n.includes("improve")) return <IconBulb size={18} />;
+                                if (n.includes("connect") || n.includes("advice")) return <IconHeart size={18} />;
+                                return <IconMessageCircle size={18} />;
+                            };
+                            return (
+                                <Box
+                                    key={category}
+                                    sx={{
+                                        backgroundColor: m.colors.snow[0],
+                                        borderRadius: "10px",
+                                        borderLeft: `4px solid ${m.colors.snow[4]}`,
+                                        padding: "16px 20px",
+                                        marginBottom: "16px",
+                                        boxShadow: "0px 2px 5px rgba(0, 0, 0, 0.05)",
+                                    }}
+                                >
+                                    <Flex align="center" gap="8px" sx={{ marginBottom: "8px", color: m.colors.snow[4] }}>
+                                        {iconFor(category)}
+                                        <Text sx={{ fontSize: "15px", fontWeight: 700, color: m.colors.snow[4] }}>
+                                            {category}
+                                        </Text>
+                                    </Flex>
+                                    <Text sx={{ fontSize: "13px", lineHeight: 1.6, color: m.colors.ebony[4] }}>
+                                        {message as string}
+                                    </Text>
+                                </Box>
+                            );
+                        })}
                     </Box>
                 </Box>
             </Flex>
