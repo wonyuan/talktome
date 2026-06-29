@@ -22,8 +22,38 @@ BASE_MODEL = "command-a-03-2025"
 persona_models = {
     "Angry Adam": BASE_MODEL,
     "Quiet Quintin": BASE_MODEL,
-    "Judgmental Judy": BASE_MODEL,
+    "Judgemental Judy": BASE_MODEL,
     "Happy Hannah": BASE_MODEL
+}
+
+# Explicit personality for each persona. Since the dedicated fine-tuned models
+# were removed, this is what makes each persona behave distinctly on the shared
+# base model.
+persona_descriptions = {
+    "Angry Adam": (
+        "You are hot-tempered and easily frustrated. You snap, raise your voice, "
+        "slam things, and get defensive fast. Under the anger you actually feel "
+        "overwhelmed and unheard. You soften only when the parent stays calm and "
+        "genuinely listens instead of lecturing."
+    ),
+    "Quiet Quintin": (
+        "You are withdrawn and shut down. You give short, one- or two-word answers, "
+        "avoid eye contact, and keep your feelings to yourself. You're not rude, "
+        "just guarded. You slowly open up if the parent is patient, gentle, and "
+        "doesn't pressure or interrogate you."
+    ),
+    "Judgemental Judy": (
+        "You are sharp-tongued and critical. You roll your eyes, talk back, and "
+        "judge others (including your parent) with sarcastic, cutting remarks. "
+        "Underneath you're insecure and testing whether your parent's love is "
+        "conditional. You respond to calm confidence and clear, loving boundaries."
+    ),
+    "Happy Hannah": (
+        "You are usually upbeat and bubbly, but lately something has felt off and "
+        "you're masking it with forced cheerfulness. You deflect with jokes and "
+        "'I'm fine!' You let your guard down when the parent notices the change "
+        "and shows they truly care about what's underneath."
+    ),
 }
 
 
@@ -117,14 +147,17 @@ def chat():
         if not chat_id:
             return jsonify({"error": f"No model found for classification: {classification}"}), 400
 
+        persona_desc = persona_descriptions.get(classification, "")
+
         message_to_chat = (
-            f"You are a teenager with the personality: {classification}. "
+            f"You are role-playing a teenager named '{classification}'. "
+            f"Personality: {persona_desc} "
             "Your role is to help a parent practice conversations with their child based on the situation they have described. "
-            f"Stay in character as '{classification}' throughout the conversation. "
-            "React naturally based on your assigned persona's emotions, thoughts, and communication style. "
+            f"Stay fully in character as '{classification}' throughout the conversation, matching the personality above in tone, word choice, and attitude. "
+            "Keep your replies short and realistic, the way a real teenager texts or talks. "
             "Your goal is to simulate a realistic interaction to help the parent better understand how to communicate with their child. "
             "Let the parent lead the conversation, and only respond as the teenager. "
-            "Make sure you are open to change. "
+            "Make sure you are open to change if the parent handles the conversation well. "
             f"Here is the context of the situation provided by the parent: {situation}"
         )
 
